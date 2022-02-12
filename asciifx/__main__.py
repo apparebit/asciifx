@@ -9,29 +9,29 @@ from .perform import perform
 
 def create_parser() -> ArgumentParser:
     parser = ArgumentParser(
-        prog="asciiscript",
+        prog="ascii-fx",
         description="turns Python scripts into simulated interactive sessions",
     )
 
     parser.add_argument(
         "script",
-        help="the Python script to convert into a simulated interactive session",
+        help="The Python script to convert into a simulated interactive session",
     )
     parser.add_argument(
-        "--speedup",
+        "--scale",
         type=float,
-        help="speed up the asciicast by a factor < 1.0, slow it down by a factor > 1.0",
+        help="Speed up the asciicast by a factor < 1.0, slow it down by a factor > 1.0",
     )
     parser.add_argument(
         "--width",
         default=80,
         type=int,
-        help="set the asciicast terminal width",
+        help="Set the asciicast terminal width",
     )
     parser.add_argument(
-        "--height", default=35, type=int, help="set the asciicast terminal height"
+        "--height", default=35, type=int, help="Set the asciicast terminal height"
     )
-    parser.add_argument("--title", type=str, help="set the asciicast title")
+    parser.add_argument("--title", type=str, help="Set the asciicast title")
 
     return parser
 
