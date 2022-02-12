@@ -8,5 +8,4 @@
 __pycache__
 dist
 node_modules
-package.json
 package-lock.json
