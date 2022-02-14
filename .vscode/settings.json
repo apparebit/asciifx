@@ -3,5 +3,6 @@
         "absolutized",
         "deque",
         "konsole"
-    ]
+    ],
+    "svg.preview.background": "dark-transparent"
 }
