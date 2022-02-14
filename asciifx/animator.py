@@ -67,10 +67,11 @@ observation and reuses the layout of the [Kinesis contoured
 keyboard](https://kinesis-ergo.com/shop/advantage2/) to assign ASCII letters to
 hands.
 
-Since mean and standard deviation are unsuitable as parameters for the
-log-logistic and Dagum distributions, `Animator` uses the log-normal
-distribution instead. Furthermore, it generalizes the IKI statistics to all
-bigrams — using the Kinesis contoured keyboard for selecting hands.
+Since there are no readily apparent formulas for deriving the parameters of the
+log-logistic or Dagum distributions from a given mean and standard deviation,
+`Animator` uses the log-normal distribution for now. Furthermore, it assumes
+that reported IKI statistics generalize to all bigrams — mapped to hands based
+on the layout of the Kinesis contoured keyboard.
 """
 
 from __future__ import annotations
@@ -80,7 +81,7 @@ import inspect
 import math
 import random
 import re
-from typing import Optional
+from typing import Callable, Optional
 
 from .event import Event, EventType
 from .repl import Interaction
@@ -89,57 +90,99 @@ from .repl import Interaction
 OUT = EventType.OUT
 
 
+class InvalidPragma(Exception):
+    pass
+
+
 class Controller:
     """
     Support for handling pragmas, which may modify the timing of the simulation
     or suppress part of it altogether. Pragmas are embedded as comments in the
-    stream of interactions.
+    stream of interactions and can have zero or one arguments. Methods that do
+    not implement a pragma must either start with an underscore `_` or, if they
+    are public, start with `do_`. The rest
     """
 
     SYNTAX = re.compile(
-        r"^\#\[(?P<command>[a-z]+)(?:[ \t]*[=][ \t]*(?P<param>[^\]]+))?\]\n$"
+        r"^\#\[(?P<command>[^ \t=]+)(?:[ \t]*[=][ \t]*(?P<param>[^\]]+))?\]\n$"
     )
 
     def __init__(self) -> None:
-        pass
+        self._lines: int = 0
 
-    def register(self, animator: Animator) -> Controller:
+    def do_register(self, animator: Animator) -> Controller:
         self._animator = animator
         return self
 
-    def handle_pragma(self, line: str) -> bool:
+    def do_handle_pragma(self, line: str) -> bool:
+        self._lines += 1
+
         if (match := self.SYNTAX.match(line)) is None:
             return False
 
-        command = match.group("command")
-        if command == "handle" or command.startswith("_") or not hasattr(self, command):
-            return False
+        command, argument = match.groups()
+        command = command.strip()
 
-        method = getattr(self, command)
-        param_count = len(inspect.signature(method).parameters)
-        if param_count == 0:
+        method = getattr(self, command.replace("-", "_"), None)
+        if method is None or not callable(method) or command.startswith(("_", "do_")):
+            raise InvalidPragma(
+                f'#[{command}] on line {self._lines} is not recognized '
+                'as a valid pragma.'
+            )
+
+        parameter_count = len(inspect.signature(method).parameters)
+        argument = argument if argument is None else argument.strip()
+
+        if parameter_count == 0:
+            if argument is not None:
+                raise InvalidPragma(
+                    f'#[{command}] on line {self._lines} has no arguments '
+                    f'but "{argument}" is provided.'
+                )
             method()
-            return True
-        elif param_count == 1:
-            method(match.group("param"))
-            return True
+        elif parameter_count == 1:
+            if argument is None:
+                raise InvalidPragma(
+                    f'#[{command}] on line {self._lines} requires an argument '
+                    'but none is provided.'
+                )
+            method(argument)
         else:
-            return False
+            assert False, f"Pragma implementation has {parameter_count} parameters."
+
+        return True
+
+    def _parse_float(self, command: str, argument: str) -> float:
+        try:
+            return float(argument)
+        except ValueError as x:
+            raise InvalidPragma(
+                f'#[{command}] on line {self._lines} requires floating point '
+                f'number but got "{argument}".'
+            ) from x
 
     def on(self) -> None:
-        self._animator.set_silent(False)
+        self._animator.is_silent = False
 
     def off(self) -> None:
-        self._animator.set_silent(True)
+        self._animator.is_silent = True
 
-    def think(self, data: str) -> None:
-        self._animator.set_thinking(float(data))
+    def think_time(self, data: str) -> None:
+        self._animator.next_thought_delay = self._parse_float("think-time", data)
+
+    def speed(self, data: str) -> None:
+        self._animator.speed = self._parse_float("speed", data)
+
+    def keypress_speed(self, data: str) -> None:
+        self._animator.keypress_speed = self._parse_float("keypress-speed", data)
 
 
 def as_lognorm_params(mean: float, stddev: float) -> tuple[float, float]:
+    # See https://en.wikipedia.org/wiki/Log-normal_distribution#Definitions
+    # Also note that second conversion formula has sigma^2 on left side.
     return (
         math.log(mean**2.0 / math.sqrt(mean**2.0 + stddev**2.0)),
-        math.log(1 + stddev**2.0 / mean**2.0),
+        math.sqrt(math.log(1 + stddev**2.0 / mean**2.0)),
     )
 
 
@@ -178,39 +221,36 @@ class Animator:
     OUTPUT_INCR_DELAY: float = 0.200
     END_DELAY: float = 5.0
 
-    def __init__(self, controller: Controller) -> None:
-        self._controller: Controller = controller.register(self)
-        self._is_silent: bool = False
-        self._thinking: Optional[float] = None
+    def __init__(
+        self,
+        controller: Controller,
+        *,
+        keypress_speed: float = 1.0,
+        speed: float = 1.0,
+    ) -> None:
+        self._controller: Controller = controller.do_register(self)
         self._previous_interaction: Optional[Interaction] = None
-        self._random_delay = random.lognormvariate
+        self._random_delay: Callable[[float, float], float] = random.lognormvariate
 
-    @property
-    def is_silent(self) -> bool:
-        return self._is_silent
-
-    def set_silent(self, silent: bool) -> Animator:
-        self._is_silent = silent
-        return self
+        self.is_silent: bool = False
+        self.next_thought_delay: Optional[float] = None
+        self.keypress_speed: float = keypress_speed
+        self.speed: float = speed
 
     @property
     def previous_interaction(self) -> Optional[Interaction]:
         return self._previous_interaction
 
-    def set_thinking(self, duration: float) -> Animator:
-        self._thinking = duration
-        return self
-
     def render_all(self, interactions: Iterable[Interaction]) -> Iterator[Event]:
         """Render the interaction stream into an event stream with relative time."""
         for interaction in interactions:
             yield from self.render(interaction)
-        yield Event(self.END_DELAY, OUT, "")
+        yield self.event(self.END_DELAY, "")
 
     def render(self, interaction: Interaction) -> Iterator[Event]:
         """Render a single interaction."""
         prompt, input, output = interaction
-        if self._controller.handle_pragma(input) or self._is_silent:
+        if self._controller.do_handle_pragma(input) or self.is_silent:
             # Directives and silent interactions should not influence timings.
             # Hence they are skipped as previous interactions.
             return
@@ -220,33 +260,36 @@ class Animator:
         yield from self.render_output(output)
 
         self._previous_interaction = interaction
-        self._thinking = None
+        self.next_thought_delay = None
 
     def render_prompt(self, prompt: str) -> Iterator[Event]:
         """Render the prompt."""
-        yield Event(self.delay_prompt(), OUT, prompt)
+        yield self.event(self.delay_prompt(), prompt)
 
     def render_input(self, input: str) -> Iterator[Event]:
         """Render the input."""
         letters = iter(input)
 
         previous_letter = next(letters, "")
-        if self._thinking is None:
+        if self.next_thought_delay is None:
             delay = self.delay_input()
         else:
-            delay = self._thinking
-        yield Event(delay, OUT, previous_letter)
+            delay = self.next_thought_delay
+        yield self.event(delay, previous_letter)
 
         for pending_letter in letters:
             delay = self.delay_keypress(previous_letter, pending_letter)
-            yield Event(delay, OUT, pending_letter)
+            yield self.event(delay, pending_letter)
             previous_letter = pending_letter
 
     def render_output(self, output: str) -> Iterator[Event]:
         """Render the output."""
         for index, section in enumerate(self.section_output(output)):
             delay = self.delay_output(index, output)
-            yield Event(delay, OUT, section)
+            yield self.event(delay, section)
+
+    def event(self, time: float, data: str) -> Event:
+        return Event(time * self.speed, OUT, data)
 
     def section_output(self, output: str) -> Iterator[str]:
         """Split interpreter output into sections."""
@@ -271,12 +314,15 @@ class Animator:
     def delay_keypress(self, previous: str, current: str) -> float:
         # IKI mean and stddev are in milliseconds. Adjust delay accordingly.
         if previous == current:
-            return self._random_delay(*self.SAME_LETTER_IKI) / 1000.0
+            delay = self._random_delay(*self.SAME_LETTER_IKI) / 1000.0
         if previous in self.LEFT_HAND and current in self.LEFT_HAND:
-            return self._random_delay(*self.LEFT_IKI) / 1000.0
+            delay = self._random_delay(*self.LEFT_IKI) / 1000.0
         if previous in self.RIGHT_HAND and current in self.RIGHT_HAND:
-            return self._random_delay(*self.RIGHT_IKI) / 1000.0
-        return self._random_delay(*self.ALTERNATE_IKI) / 1000.0
+            delay = self._random_delay(*self.RIGHT_IKI) / 1000.0
+        else:
+            delay = self._random_delay(*self.ALTERNATE_IKI) / 1000.0
+
+        return delay * self.keypress_speed
 
     def delay_output(self, index: int, section: str) -> float:
         if index == 0:
