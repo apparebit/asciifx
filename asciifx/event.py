@@ -65,7 +65,7 @@ def with_absolute_time(events: Iterable[Event]) -> Iterator[Event]:
     """Convert an event stream with relative times to absolute times."""
     previous_time = 0.0
     for event in events:
-        absolutized = event.absolute_time(previous_time)
+        absolutized = event.with_absolute_time(previous_time)
         yield absolutized
         previous_time = absolutized.time
 
@@ -74,7 +74,7 @@ def with_relative_time(events: Iterable[Event]) -> Iterator[Event]:
     """Convert an event stream with absolute times to relative times."""
     previous_time = 0.0
     for event in events:
-        relativized = event.relative_time(previous_time)
+        relativized = event.with_relative_time(previous_time)
         yield relativized
         previous_time = event.time
 
@@ -82,7 +82,7 @@ def with_relative_time(events: Iterable[Event]) -> Iterator[Event]:
 def with_speed(events: Iterable[Event], speed: float = 1.0) -> Iterator[Event]:
     """Scale events' durations. This function requires relative times."""
     for event in events:
-        yield event.scaled_time(speed)
+        yield event.with_speed(speed)
 
 
 def with_max_time(events: Iterable[Event], maximum: float = 10.0) -> Iterator[Event]:
