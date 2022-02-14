@@ -1,4 +1,4 @@
-#[keypress-speed=0.5]
+#[keypress-speed=0.6]
 #[off]
 import konsole
 konsole.config(use_color=True)

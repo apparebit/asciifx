@@ -19,7 +19,7 @@ Consider this Python script to show off the libray that inspired this package,
 [konsole](https://github.com/apparebit/konsole):
 
 ```python
-#[keypress-speed=0.5]
+#[keypress-speed=0.6]
 #[off]
 import konsole
 konsole.config(use_color=True)
@@ -42,7 +42,7 @@ statements are executed nonetheless.
 With that, we are ready to run asciifx:
 
 ```sh
-$ python -m asciifx -o output.cast input.py
+$ python -m asciifx --height 13 -o output.cast input.py
 ```
 
 You can watch the resulting asciicast with asciinema — or convert it to SVG with
