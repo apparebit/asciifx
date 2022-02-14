@@ -34,17 +34,17 @@ class Event:
         time, type, data = json.loads(line)
         return cls(time, EventType(type), data)
 
-    def absolute_time(self, previous_time: float) -> Event:
+    def with_absolute_time(self, previous_time: float) -> Event:
         """Make the event's time absolute."""
         return Event(self.time + previous_time, self.type, self.data)
 
-    def relative_time(self, previous_time: float) -> Event:
+    def with_relative_time(self, previous_time: float) -> Event:
         """Make the event's time relative."""
         return Event(self.time - previous_time, self.type, self.data)
 
-    def scaled_time(self, factor: float) -> Event:
+    def with_speed(self, speed: float) -> Event:
         """Scale the event's time, which should be relative."""
-        return Event(self.time * factor, self.type, self.data)
+        return Event(self.time * speed, self.type, self.data)
 
     def __str__(self) -> str:
         return self.as_json()
@@ -61,7 +61,7 @@ def get_duration(events: Iterable[Event]) -> float:
     return math.fsum(event.time for event in events)
 
 
-def with_absolute_times(events: Iterable[Event]) -> Iterator[Event]:
+def with_absolute_time(events: Iterable[Event]) -> Iterator[Event]:
     """Convert an event stream with relative times to absolute times."""
     previous_time = 0.0
     for event in events:
@@ -70,7 +70,7 @@ def with_absolute_times(events: Iterable[Event]) -> Iterator[Event]:
         previous_time = absolutized.time
 
 
-def with_relative_times(events: Iterable[Event]) -> Iterator[Event]:
+def with_relative_time(events: Iterable[Event]) -> Iterator[Event]:
     """Convert an event stream with absolute times to relative times."""
     previous_time = 0.0
     for event in events:
@@ -79,10 +79,10 @@ def with_relative_times(events: Iterable[Event]) -> Iterator[Event]:
         previous_time = event.time
 
 
-def with_scaled_times(events: Iterable[Event], factor: float = 1.0) -> Iterator[Event]:
-    """Scale events' durations. This function works best for relative times."""
+def with_speed(events: Iterable[Event], speed: float = 1.0) -> Iterator[Event]:
+    """Scale events' durations. This function requires relative times."""
     for event in events:
-        yield event.scaled_time(factor)
+        yield event.scaled_time(speed)
 
 
 def with_max_time(events: Iterable[Event], maximum: float = 10.0) -> Iterator[Event]:
