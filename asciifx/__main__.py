@@ -23,13 +23,13 @@ def create_parser() -> ArgumentParser:
         "--speed",
         type=float,
         default=1.0,
-        help="Adjust overall speed by multiplying delays between events by value."
+        help="Adjust overall speed by multiplying delays between events by value.",
     )
     parser.add_argument(
         "--keypress-speed",
         type=float,
         default=1.0,
-        help="Adjust speed of keystrokes by multiplying delay between them by value."
+        help="Adjust speed of keystrokes by multiplying delay between them by value.",
     )
     parser.add_argument(
         "--width",
