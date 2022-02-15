@@ -85,6 +85,7 @@ from typing import Callable, Optional
 
 from .event import Event, EventType
 from .repl import Interaction
+from .util import no_ansi_escape
 
 
 OUT = EventType.OUT
@@ -100,7 +101,7 @@ class Controller:
     or suppress part of it altogether. Pragmas are embedded as comments in the
     stream of interactions and can have zero or one arguments. Methods that do
     not implement a pragma must either start with an underscore `_` or, if they
-    are public, start with `do_`. The rest
+    are public, start with `do_`.
     """
 
     SYNTAX = re.compile(
@@ -108,14 +109,15 @@ class Controller:
     )
 
     def __init__(self) -> None:
-        self._lines: int = 0
+        # The number of lines in the input script seen so far.
+        self._lineno: int = 0
 
     def do_register(self, animator: Animator) -> Controller:
         self._animator = animator
         return self
 
     def do_handle_pragma(self, line: str) -> bool:
-        self._lines += 1
+        self._lineno += 1
 
         if (match := self.SYNTAX.match(line)) is None:
             return False
@@ -126,7 +128,7 @@ class Controller:
         method = getattr(self, command.replace("-", "_"), None)
         if method is None or not callable(method) or command.startswith(("_", "do_")):
             raise InvalidPragma(
-                f'#[{command}] on line {self._lines} is not recognized '
+                f'#[{command}] on line {self._lineno} is not recognized '
                 'as a valid pragma.'
             )
 
@@ -136,14 +138,14 @@ class Controller:
         if parameter_count == 0:
             if argument is not None:
                 raise InvalidPragma(
-                    f'#[{command}] on line {self._lines} has no arguments '
+                    f'#[{command}] on line {self._lineno} has no arguments '
                     f'but "{argument}" is provided.'
                 )
             method()
         elif parameter_count == 1:
             if argument is None:
                 raise InvalidPragma(
-                    f'#[{command}] on line {self._lines} requires an argument '
+                    f'#[{command}] on line {self._lineno} requires an argument '
                     'but none is provided.'
                 )
             method(argument)
@@ -157,7 +159,7 @@ class Controller:
             return float(argument)
         except ValueError as x:
             raise InvalidPragma(
-                f'#[{command}] on line {self._lines} requires floating point '
+                f'#[{command}] on line {self._lineno} requires floating point '
                 f'number but got "{argument}".'
             ) from x
 
@@ -228,14 +230,24 @@ class Animator:
         keypress_speed: float = 1.0,
         speed: float = 1.0,
     ) -> None:
-        self._controller: Controller = controller.do_register(self)
-        self._previous_interaction: Optional[Interaction] = None
         self._random_delay: Callable[[float, float], float] = random.lognormvariate
+        self._controller: Controller = controller.do_register(self)
+        self._width = 0
+        self._height = 0
+        self._previous_interaction: Optional[Interaction] = None
 
         self.is_silent: bool = False
         self.next_thought_delay: Optional[float] = None
         self.keypress_speed: float = keypress_speed
         self.speed: float = speed
+
+    @property
+    def width(self) -> int:
+        return self._width
+
+    @property
+    def height(self) -> int:
+        return self._height
 
     @property
     def previous_interaction(self) -> Optional[Interaction]:
@@ -255,12 +267,25 @@ class Animator:
             # Hence they are skipped as previous interactions.
             return
 
+        self.update_cast_size(interaction)
+
         yield from self.render_prompt(prompt)
         yield from self.render_input(input)
         yield from self.render_output(output)
 
         self._previous_interaction = interaction
         self.next_thought_delay = None
+
+    def update_cast_size(self, interaction: Interaction) -> None:
+        prompt, input, output = interaction
+
+        self._width = max(self._width, len(prompt) + len(input))
+        self._height += 1
+
+        lines = output.splitlines()
+        columns = max((len(no_ansi_escape(line)) for line in lines), default=0)
+        self._width = max(self._width, columns)
+        self._height += len(lines)
 
     def render_prompt(self, prompt: str) -> Iterator[Event]:
         """Render the prompt."""
