@@ -3,7 +3,7 @@ requires = ["flit_core >=3.2,<4"]
 build-backend = "flit_core.buildapi"
 
 [project]
-name = "ascii-fx"
+name = "asciifx"
 requires-python = ">=3.8"
 authors = [{name = "Robert Grimm", email = "apparebit@gmail.com"}]
 readme = "README.md"
@@ -34,13 +34,10 @@ dev = [
 ]
 
 [project.scripts]
-ascii-fx = "asciifx"
+asciifx = "asciifx"
 
 [project.urls]
-Home = "https://github.com/apparebit/ascii-fx"
-
-[tool.flit.module]
-name = "asciifx"
+Home = "https://github.com/apparebit/asciifx"
 
 [tool.mypy]
 files = ["asciifx/*.py"]
