@@ -47,6 +47,9 @@ def create_parser() -> ArgumentParser:
         dest="output",
         help="Provide the path to the resulting asciicast.",
     )
+    parser.add_argument(
+        "-v", "--verbose", action="store_true", help="Run in verbose mode."
+    )
 
     return parser
 
@@ -54,6 +57,9 @@ def create_parser() -> ArgumentParser:
 def main() -> None:
     parser = create_parser()
     options = parser.parse_args()
+
+    if options.verbose:
+        konsole.config(level=konsole.DEBUG)
 
     if not options.title:
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -63,16 +69,14 @@ def main() -> None:
         input_path = Path(options.input).resolve()
 
         with open(input_path, mode="r", encoding="utf8") as file:
-            output = [
-                *perform(
-                    file,
-                    speed=options.speed,
-                    keypress_speed=options.keypress_speed,
-                    width=options.width,
-                    height=options.height,
-                    title=options.title,
-                )
-            ]
+            events, effective_width, effective_height = perform(
+                file,
+                speed=options.speed,
+                keypress_speed=options.keypress_speed,
+                width=options.width,
+                height=options.height,
+                title=options.title,
+            )
 
         if options.output:
             output_path = Path(options.output).resolve()
@@ -80,7 +84,7 @@ def main() -> None:
             output_path = Path.cwd() / input_path.with_suffix(".cast").name
 
         with open(output_path, mode="w", encoding="utf8") as file:
-            file.writelines(output)
+            file.writelines(events)
 
     except FileNotFoundError as x:
         konsole.critical('Unable to find file "%s"', x.filename)
@@ -89,7 +93,13 @@ def main() -> None:
     except Exception as x:
         konsole.critical('Unexpected error: %s', str(x), exc_info=x)
     else:
-        konsole.info('Successfully created "%s"', output_path)
+        konsole.info(
+            'Saved asciicast with %d events, %d columns, and %d lines in "%s"',
+            len(events) - 1,
+            effective_width,
+            effective_height,
+            output_path,
+        )
 
 
 main()
