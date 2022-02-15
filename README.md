@@ -19,19 +19,20 @@ Consider this Python script to show off the libray that inspired this package,
 [konsole](https://github.com/apparebit/konsole):
 
 ```python
+# https://github.com/apparebit/konsole
 #[keypress-speed=0.6]
 #[off]
 import konsole
 konsole.config(use_color=True)
 #[on]
-konsole.info("fyi", detail=["for", "your", "information"])
+konsole.info("fyi", detail="stuff")
 konsole.warning("beware")
-konsole.error("bad")
-konsole.critical("enough already!!!")
+konsole.error("fail")
+konsole.critical("boom!")
 quit()
 ```
 
-The comments may look like [Rust
+Some of the comments may look like [Rust
 annotations](https://doc.rust-lang.org/rust-by-example/attribute.html) but still
 are valid Python. In the context of asciifx, they also are called pragmas and
 control the performance. `keypress-speed` speeds up simulated keypresses because
@@ -39,17 +40,17 @@ they just aren't *that* interesting to watch. `off`/`on` prevent the import and
 configuration of konsole from appearing in the final asciicast, though the two
 statements are executed nonetheless.
 
-With that, we are ready to run asciifx:
+With that, we are ready to stage a performance:
 
 ```sh
-$ python -m asciifx --height 13 -o output.cast input.py
+$ python -m asciifx --width 50 --height 12 -o output.cast input.py
 ```
 
 You can watch the resulting asciicast with asciinema — or convert it to SVG with
 [svg-term-cli](https://github.com/marionebl/svg-term-cli):
 
 ![An interactive Python session using
-konsole](https://raw.githubusercontent.com/apparebit/asciifx/boss/example/image.svg)
+konsole](https://raw.githubusercontent.com/apparebit/asciifx/boss/example/asciifx.svg)
 
 
 ## Pragmas
@@ -89,9 +90,9 @@ So I scoped out writing my own tool: Python's [code
 module](https://docs.python.org/3/library/code.html) has all the REPL support
 I'd need, nicely abstracted. [asciicast
 v2](https://github.com/asciinema/asciinema/blob/develop/doc/asciicast-v2.md) is
-an eminently reasonable file format to target. All that was missing was a
-suitable model for human keystroke dynamics. After a quick literature search,
-even that model seemed within reach.
+an eminently reasonable file format to target. The one thing that was missing
+was a suitable model for human keystroke dynamics. After a quick literature
+search, even that model seemed within reach.
 
 Alas, turning scientific writing into executable code easily becomes an exercise
 in frustration. There is ambiguous language in the definition of critical
@@ -102,7 +103,7 @@ event](https://developer.mozilla.org/en-US/docs/Web/API/Document/keypress_event)
 There also are probability distributions that are surprisingly hostile to casual
 human use. (No, μ and σ are *not* the mean and standard deviation of the
 log-normal distribution. Yes, they are the customary parameters for that
-distribution nonetheless. Converting mean and standard deviation to these
+distribution nonetheless. Converting the mean and standard deviation to these
 parameters is left as an exercise for the reader. 😈)
 
 ---
