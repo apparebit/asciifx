@@ -1,8 +1,12 @@
+#!/usr/bin/env python3
+
 import konsole
 
 from argparse import ArgumentParser
 from datetime import datetime
+import errno
 from pathlib import Path
+import sys
 
 from .animator import InvalidPragma
 from .perform import perform
@@ -10,7 +14,7 @@ from .perform import perform
 
 def create_parser() -> ArgumentParser:
     parser = ArgumentParser(
-        prog="ascii-fx",
+        prog="asciifx",
         description="Turn a Python script into a simulated interactive session. The "
         "resulting asciicast is written to the current working directory by default.",
     )
@@ -54,16 +58,16 @@ def create_parser() -> ArgumentParser:
     return parser
 
 
-def main() -> None:
+def main(args: None | list[str] = None) -> int:
     parser = create_parser()
-    options = parser.parse_args()
+    options = parser.parse_args(args)
 
     if options.verbose:
         konsole.config(level=konsole.DEBUG)
 
     if not options.title:
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        options.title = f'Created by ascii-fx on {now} from "{options.input}"'
+        options.title = f'Created by asciifx on {now} from "{options.input}"'
 
     try:
         input_path = Path(options.input).resolve()
@@ -88,10 +92,13 @@ def main() -> None:
 
     except FileNotFoundError as x:
         konsole.critical('Unable to find file "%s"', x.filename)
+        return getattr(errno, "ENOENT", 2)
     except InvalidPragma as x:
         konsole.critical(x.args[0])
+        return getattr(errno, "EINVAL", 22)
     except Exception as x:
         konsole.critical('Unexpected error: %s', str(x), exc_info=x)
+        return getattr(errno, "EIO", 5)
     else:
         konsole.info(
             'Saved asciicast with %d events, %d columns, and %d lines in "%s"',
@@ -100,6 +107,8 @@ def main() -> None:
             effective_height,
             output_path,
         )
+        return 0
 
 
-main()
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

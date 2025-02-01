@@ -34,7 +34,7 @@ dev = [
 ]
 
 [project.scripts]
-asciifx = "asciifx"
+asciifx = "asciifx.__main__:main"
 
 [project.urls]
 Home = "https://github.com/apparebit/asciifx"
